@@ -1,13 +1,23 @@
-// Example of state machine
-// Author: Nick Gammon
-// Date: 5 December 2013
+// Adapted from State Machine example at https://www.gammon.com.au/serial
 
 #include <Servo.h>
 
 Servo elevator; 
 
 /*
- * Move elevator with command R45 (for position 45)
+ * Usage:
+ * Use the serial monitor (Tools -> Serial monitor) to
+ * send commands to the T-maze; make sure the monitor
+ * is set to 115200 baud and that the line ending is
+ * set to "Newline". Commands are entered in the
+ * monitor and sent by pressing Return/Enter.
+ * 
+ * The following commands are available:
+ * Exxx - move the elevator to position xxx
+ * Pxxx - pulse the air solenoid
+ * 
+ * Commands can be chained together by delimiting
+ * them with a semi-colon (;) e.g. E50;P100;E200
  */
 
 /* 
@@ -31,49 +41,64 @@ typedef enum { STATE_NONE,
               } states;
 
 const byte solenoidPin = 8;
-int timeOpen = 500; // time (in ms) solenoid stays open to allow air flow
+
+// time (in ms) solenoid stays open to allow air flow
+int timeOpen = 500; 
 
 // current state-machine state
 states state = STATE_NONE;
 
+
 void setup ()
   { 
   Serial.begin (115200);
-  Serial.println (F("Starting ..."));
+  Serial.println (F("Ready to receive command"));
+  Serial.println (F("e.g. E50;P100;E200"));
   elevator.attach(9);
   
   pinMode(solenoidPin, OUTPUT);
   digitalWrite(solenoidPin, LOW);
   
   } // end of setup
+
   
 void doElevator (const long pos)
   {
+  /*  
+   * Move elevator (servo) to desired
+   * position 'pos'.
+   */
+  // TODO: delay some time (?) until we reach end pos
   // rotate to desired angle 
   Serial.print (F("Moving elevator to "));
   Serial.println (pos); 
   elevator.write(pos);
   }  
 
-void doPuff (const long pos)
-  {
-  // rotate to desired angle 
-  Serial.print (F("Puffing at "));
-  Serial.println (pos);
 
-  digitalWrite(solenoidPin, HIGH);
+void doPuff (const long timeClosed, int pin)
+  {
+  /*
+   * Modulate solenoid state found on
+   * 'pin'; time open equal to 'timeOpen',
+   * time close equal to 'timeClosed'
+   */
+  Serial.print (F("Puffing solenoid at "));
+  Serial.print (timeClosed);
+  Serial.println (F("ms"));
+
+  // do an open-close-open twice
+  digitalWrite(pin, HIGH);
   delay(timeOpen);
-  digitalWrite(solenoidPin, LOW);
-  delay(pos);
-  digitalWrite(solenoidPin, HIGH);
+  digitalWrite(pin, LOW);
+  delay(timeClosed);
+  digitalWrite(pin, HIGH);
   delay(timeOpen);
-  digitalWrite(solenoidPin, LOW);
-  delay(pos);
-  digitalWrite(solenoidPin, HIGH);
+  digitalWrite(pin, LOW);
+  delay(timeClosed);
+  digitalWrite(pin, HIGH);
   delay(timeOpen);
-  digitalWrite(solenoidPin, LOW);
-   
-//  elevator.write(pos);
+  digitalWrite(pin, LOW);
   }  
   
   
@@ -85,11 +110,11 @@ void processNumber (char command, long n)
         doElevator (n); 
         break;
     case 'P' : 
-        doPuff (n); 
+        doPuff (n, solenoidPin); 
         break;
-    }  // end of switch
+    }
   state = STATE_NONE;
-  }  // end of processNumber
+  }
 
   
 void unexpectedInput (char c)
@@ -138,14 +163,13 @@ void processInput ()
   
   byte c = Serial.read ();
 
-  Serial.println(c);
-
   // process according to what the input was  
   switch (toupper (c))
     {
    
     case '\n':
     case '\r':
+    case ';':
       gotNewline ();
       break;
       
@@ -170,12 +194,11 @@ void processInput ()
       break;
     } // end of switch on event (input) type
   }  // end of processInput
+
   
 void loop ()
   {
   
   if (Serial.available ())
     processInput ();
-    
-  
-  } // end of loop
+  }
