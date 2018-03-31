@@ -38,9 +38,11 @@ Servo elevator;
 typedef enum { STATE_NONE, 
                STATE_E, 
                STATE_P, 
+               STATE_W,
               } states;
 
 const byte solenoidPin = 8;
+const byte elevatorPin = 9;
 
 // time (in ms) solenoid stays open to allow air flow
 int timeOpen = 500; 
@@ -54,7 +56,7 @@ void setup ()
   Serial.begin (115200);
   Serial.println (F("Ready to receive command"));
   Serial.println (F("e.g. E50;P100;E200"));
-  elevator.attach(9);
+  elevator.attach(elevatorPin);
   
   pinMode(solenoidPin, OUTPUT);
   digitalWrite(solenoidPin, LOW);
@@ -74,6 +76,19 @@ void doElevator (const long pos)
   Serial.println (pos); 
   elevator.write(pos);
   }  
+
+void doWait (const long ms) {
+  /*
+   * Time (in ms) to wait or pause program.
+   * This allows for things like waiting
+   * until the elevator reaches a position
+   * or for conditioning time
+   */
+   Serial.print("Waiting ");
+   Serial.print(ms);
+   Serial.println(" ms ...");
+   delay(ms);
+}
 
 
 void doPuff (const long timeClosed, int pin)
@@ -111,6 +126,9 @@ void processNumber (char command, long n)
         break;
     case 'P' : 
         doPuff (n, solenoidPin); 
+        break;
+    case 'W':
+        doWait (n);
         break;
     }
   state = STATE_NONE;
@@ -183,6 +201,12 @@ void processInput ()
       commandType = 'P';
       receivedNumber = 0;
       state = STATE_P;
+      break;
+
+    case 'W':
+      commandType = 'W';
+      receivedNumber = 0;
+      state = STATE_W;
       break;
       
     case '0' ... '9': 
